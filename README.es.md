@@ -7,6 +7,8 @@ los límites y el uso de tu plan de Claude.
 
 *[Read in English](README.md)*
 
+![Claudito en el escritorio y su panel de la barra](preview.png)
+
 Es la versión solo para Omarchy de
 [Claudito](https://github.com/coricogit/claudito), que también tiene widgets
 para KDE Plasma 6.
@@ -99,3 +101,7 @@ Claude Code está abierto. El historial sale de tus transcripciones locales en
 ningún sitio.
 
 Los ajustes del muñequito se guardan en `~/.local/state/claudito/omarchy.json`.
+
+## Licencia
+
+[MIT](LICENSE).

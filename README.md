@@ -7,6 +7,8 @@ limits and usage.
 
 *[Leer en español](README.es.md)*
 
+![Claudito on the desktop and its bar panel](preview.png)
+
 This is the Omarchy-only version of
 [Claudito](https://github.com/coricogit/claudito), which also has KDE Plasma 6
 widgets.
@@ -95,3 +97,7 @@ open. The history comes from your local transcripts in `~/.claude/projects`
 `claude auth status`. Nothing is sent anywhere.
 
 The buddy's settings live in `~/.local/state/claudito/omarchy.json`.
+
+## License
+
+[MIT](LICENSE).
