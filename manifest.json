@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "corico.claudito",
+  "name": "Claudito",
+  "version": "1.0.0",
+  "author": "corico",
+  "description": "Claude Code as a pixel-art buddy on the desktop, with hats for each kind of work, plus a bar widget with plan limits, session and token usage",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "service": "Buddy.qml",
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Claudito",
+    "description": "Claude plan limits, current Claude Code session and token usage, with a tiny Claudito",
+    "category": "System",
+    "defaultSection": "right",
+    "allowMultiple": false
+  }
+}

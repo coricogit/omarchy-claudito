@@ -1,0 +1,81 @@
+#!/bin/bash
+# Connects Claudito to Claude Code: adds claudito-hook as an async hook on the
+# session, prompt, tool, notification and stop events, and claudito-statusline
+# as the status line, in ~/.claude/settings.json. Your other settings and hooks
+# are kept, a status line you already have is left alone, and a backup goes to
+# settings.json.claudito-backup.
+#
+#   ./setup            connect
+#   ./setup --check    exit 0 if connected, 1 if not
+#   ./setup --remove   disconnect (do this before removing the plugin)
+
+set -euo pipefail
+
+DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+SETTINGS="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+# With ~ instead of $HOME, as Claude Code expands it, so the file stays portable.
+TILDE_DIR="${DIR/#$HOME/\~}"
+HOOK_CMD="$TILDE_DIR/claudito-hook"
+STATUS_CMD="$TILDE_DIR/claudito-statusline"
+EVENTS=(SessionStart UserPromptSubmit PreToolUse PostToolUse PostToolUseFailure
+        PermissionRequest Notification Stop SessionEnd)
+
+command -v jq >/dev/null || { echo "Missing: jq" >&2; exit 1; }
+
+# Drop every hook entry that runs a claudito-hook, from here or an older install.
+JQ_REMOVE='
+  if .hooks then
+    .hooks |= (with_entries(
+      .value |= (map(.hooks |= map(select((.command // "") | contains("claudito-hook") | not)))
+                 | map(select((.hooks | length) > 0)))
+    ) | with_entries(select((.value | length) > 0)))
+    | if (.hooks | length) == 0 then del(.hooks) else . end
+  else . end'
+
+edit_settings() {   # $1 = jq program, extra args after
+  local prog="$1"; shift
+  mkdir -p "$(dirname "$SETTINGS")"
+  [[ -f $SETTINGS ]] || echo '{}' > "$SETTINGS"
+  cp "$SETTINGS" "$SETTINGS.claudito-backup"
+  local tmp; tmp="$(mktemp)"
+  jq "$@" "$prog" "$SETTINGS" > "$tmp"
+  jq -e . "$tmp" >/dev/null   # never write broken JSON
+  mv "$tmp" "$SETTINGS"
+}
+
+case "${1:-}" in
+  --check)
+    [[ -f $SETTINGS ]] || exit 1
+    jq -e --arg cmd "$HOOK_CMD" --argjson n "${#EVENTS[@]}" '
+      [(.hooks // {})[][]?.hooks[]? | select(.command == $cmd)] | length >= $n
+    ' "$SETTINGS" >/dev/null
+    exit $?
+    ;;
+  --remove)
+    [[ -f $SETTINGS ]] || exit 0
+    edit_settings "$JQ_REMOVE"' |
+      if ((.statusLine.command // "") | contains("claudito-statusline")) then del(.statusLine) else . end'
+    echo "Claudito disconnected from Claude Code (backup: $SETTINGS.claudito-backup)."
+    exit 0
+    ;;
+  "" ) ;;
+  *) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac
+
+events_json="$(printf '%s\n' "${EVENTS[@]}" | jq -R . | jq -s .)"
+edit_settings "$JQ_REMOVE"' |
+  reduce $events[] as $e (.;
+    .hooks[$e] = ((.hooks[$e] // []) + [{
+      "hooks": [{ "type": "command", "command": $cmd, "async": true, "timeout": 5 }]
+    }]))' --arg cmd "$HOOK_CMD" --argjson events "$events_json"
+echo "Hooked: ${EVENTS[*]}"
+
+current="$(jq -r '.statusLine.command // ""' "$SETTINGS")"
+if [[ -z $current || $current == *claudito-statusline* ]]; then
+  edit_settings '.statusLine = {"type": "command", "command": $s}' --arg s "$STATUS_CMD"
+  echo "Status line: claudito-statusline (model · context · 5h · 7d)"
+else
+  echo "You already have a status line ($current); left as is."
+  echo "Without claudito-statusline the panel can't show plan limits or the live session."
+fi
+echo "Done. New Claude Code sessions pick this up; in an open one, run /hooks once."
