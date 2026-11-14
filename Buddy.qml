@@ -7,7 +7,7 @@ import qs.Commons as Commons
 import "ui"
 
 // Claudito on the desktop: a small layer-shell window in a corner of the
-// first screen. It sits under your windows like a desktop widget, or above
+// chosen screen (the first one unless picked in the bar panel). It sits under your windows like a desktop widget, or above
 // them if you turn that on in the bar panel. Only the buddy itself takes
 // clicks (to poke it); the rest of the window lets them through.
 Scope {
@@ -29,15 +29,26 @@ Scope {
     function hide(): void { settings.set("buddy", false) }
     function toggle(): void { settings.set("buddy", !settings.buddy) }
     function poke(): void { if (buddyLoader.item) buddyLoader.item.poke() }
+    function monitor(name: string): void { settings.set("monitor", name) }
   }
 
-  // A layer-shell surface keeps the layer it was created on, so moving the
-  // buddy above or below windows means building the window again.
+  // The chosen screen, or the first one if it isn't connected.
+  readonly property var targetScreen: {
+    var screens = Quickshell.screens
+    for (var i = 0; i < screens.length; i++)
+      if (screens[i].name === settings.monitor) return screens[i]
+    return screens.length > 0 ? screens[0] : null
+  }
+
+  // A layer-shell surface keeps the layer and screen it was created on, so
+  // moving the buddy above or below windows, or to another screen, means
+  // building the window again.
   property bool rebuilding: false
   Connections {
     target: settings
     function onOnTopChanged() { root.rebuilding = true; rebuild.restart() }
   }
+  onTargetScreenChanged: { rebuilding = true; rebuild.restart() }
   Timer { id: rebuild; interval: 700; onTriggered: root.rebuilding = false }
 
   LazyLoader {
@@ -46,7 +57,7 @@ Scope {
 
     PanelWindow {
       id: window
-      screen: Quickshell.screens[0]
+      screen: root.targetScreen
       color: "transparent"
 
       readonly property bool atTop: settings.corner.indexOf("top") === 0

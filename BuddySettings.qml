@@ -16,6 +16,8 @@ Item {
   property bool onTop: false
   property string corner: "bottom-right"
   property string size: "medium"
+  // Screen name (e.g. DP-1); empty means the first screen.
+  property string monitor: ""
   property bool loaded: false
 
   readonly property string dir: Quickshell.env("HOME") + "/.local/state/claudito"
@@ -28,11 +30,12 @@ Item {
     onTop = s.onTop === true
     corner = corners.indexOf(s.corner) >= 0 ? s.corner : "bottom-right"
     size = sizes.indexOf(s.size) >= 0 ? s.size : "medium"
+    monitor = typeof s.monitor === "string" ? s.monitor.slice(0, 64) : ""
     loaded = true
   }
 
   function set(name, value) {
-    var next = { buddy: buddy, onTop: onTop, corner: corner, size: size }
+    var next = { buddy: buddy, onTop: onTop, corner: corner, size: size, monitor: monitor }
     next[name] = value
     apply(JSON.stringify(next))
     writer.command = ["sh", "-c", 'mkdir -p "$1" && printf "%s\\n" "$2" > "$3.tmp" && mv "$3.tmp" "$3"',

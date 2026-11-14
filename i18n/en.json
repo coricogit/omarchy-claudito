@@ -79,5 +79,6 @@
   "dur.m": "%1 min",
   "dur.s": "%1 s",
   "connect.text": "Claudito isn't connected to Claude Code yet. Connecting adds its hooks and status line to ~/.claude/settings.json (with a backup); your other settings are kept.",
-  "connect.button": "Connect to Claude Code"
+  "connect.button": "Connect to Claude Code",
+  "buddy.monitor": "Screen"
 }

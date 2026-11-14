@@ -168,20 +168,22 @@ Panel {
   property int selectedIndex: 0
   property bool cursorActive: false
   readonly property var sections: connected
-    ? ["period", "buddy", "onTop", "corner", "size", "web"]
-    : ["connect", "period", "buddy", "onTop", "corner", "size", "web"]
+    ? ["period", "buddy", "onTop", "monitor", "corner", "size", "web"]
+    : ["connect", "period", "buddy", "onTop", "monitor", "corner", "size", "web"]
 
   function moveCursor(dy) {
     var i = Math.max(0, sections.indexOf(focusSection))
     focusSection = sections[Math.max(0, Math.min(sections.length - 1, i + dy))]
     if (focusSection === "period") selectedIndex = period
     else if (focusSection === "corner") selectedIndex = buddySettings.corners.indexOf(buddySettings.corner)
+    else if (focusSection === "monitor") selectedIndex = Math.max(0, monitorIndex())
     else if (focusSection === "size") selectedIndex = buddySettings.sizes.indexOf(buddySettings.size)
     else selectedIndex = -1
   }
 
   function moveCursorH(dx) {
-    var count = focusSection === "period" ? 3 : focusSection === "corner" ? 4 : focusSection === "size" ? 3 : 0
+    var count = focusSection === "period" ? 3 : focusSection === "corner" ? 4 : focusSection === "size" ? 3
+      : focusSection === "monitor" ? Quickshell.screens.length : 0
     if (count > 0) selectedIndex = (Math.max(0, selectedIndex) + dx + count) % count
   }
 
@@ -191,8 +193,17 @@ Panel {
     else if (focusSection === "onTop") buddySettings.set("onTop", !buddySettings.onTop)
     else if (focusSection === "corner") buddySettings.set("corner", buddySettings.corners[selectedIndex])
     else if (focusSection === "size") buddySettings.set("size", buddySettings.sizes[selectedIndex])
+    else if (focusSection === "monitor" && Quickshell.screens[selectedIndex]) buddySettings.set("monitor", Quickshell.screens[selectedIndex].name)
     else if (focusSection === "web") openUsage()
     else if (focusSection === "connect") connectClaude()
+  }
+
+  // Which screen the buddy is on: the chosen one, or the first if it's gone.
+  function monitorIndex() {
+    var screens = Quickshell.screens
+    for (var i = 0; i < screens.length; i++)
+      if (screens[i].name === buddySettings.monitor) return i
+    return 0
   }
 
   function hoverCursor(section, index) {
@@ -677,6 +688,37 @@ Panel {
               fontFamily: root.fontFamily
               onClicked: buddySettings.set("onTop", !buddySettings.onTop)
               onHovered: function(isHovered) { if (isHovered) root.hoverCursor("onTop", -1) }
+            }
+
+            PlainLabel {
+              visible: Quickshell.screens.length > 1
+              text: strings.t("buddy.monitor")
+              color: root.dim
+              font.pixelSize: Style.font.caption
+              width: parent.width
+            }
+            Grid {
+              id: monitorRow
+              visible: Quickshell.screens.length > 1
+              width: parent.width
+              columns: Math.max(1, Math.min(4, Quickshell.screens.length))
+              spacing: Style.spacing.xs
+              enabled: buddySettings.buddy
+              opacity: enabled ? 1 : 0.5
+              readonly property real cellWidth: (width - spacing * (columns - 1)) / columns
+              Repeater {
+                model: Quickshell.screens
+                OptionPill {
+                  required property var modelData
+                  required property int index
+                  section: "monitor"
+                  optionIndex: index
+                  width: monitorRow.cellWidth
+                  text: String(modelData.name || "?").slice(0, 20)
+                  active: root.monitorIndex() === index
+                  onClicked: buddySettings.set("monitor", modelData.name)
+                }
+              }
             }
 
             PlainLabel {

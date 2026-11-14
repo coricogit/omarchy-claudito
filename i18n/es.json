@@ -71,5 +71,6 @@
   "size.medium": "Mediano",
   "size.large": "Grande",
   "connect.text": "Claudito todavía no está conectado a Claude Code. Al conectarlo se añaden sus hooks y su status line a ~/.claude/settings.json (con copia de seguridad); el resto de tus ajustes se mantiene.",
-  "connect.button": "Conectar con Claude Code"
+  "connect.button": "Conectar con Claude Code",
+  "buddy.monitor": "Pantalla"
 }
