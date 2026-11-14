@@ -40,7 +40,7 @@ widgets.
 - **On the desktop**: Claudito in a corner of the screen, under your windows
   like a desktop widget, with a caption saying what it's doing and in which
   project. From the bar panel you can hide it, keep it above your windows, and
-  pick its screen, corner and size. Click it to poke it.
+  pick its screen (or all of them), corner and size. Click it to poke it.
 
 The panel follows the Omarchy theme and language (English and Spanish) and
 works with the keyboard (`j`/`k`, `h`/`l`, Enter).
@@ -76,7 +76,8 @@ omarchy plugin remove corico.claudito
 
 To show or hide the buddy from a keybinding:
 `omarchy-shell corico.claudito toggle`. To move it to another screen:
-`omarchy-shell corico.claudito monitor DP-2` (names from `hyprctl monitors`).
+`omarchy-shell corico.claudito monitor DP-2` (names from `hyprctl monitors`),
+or `omarchy-shell corico.claudito monitor all` for every screen.
 
 ## How it works
 

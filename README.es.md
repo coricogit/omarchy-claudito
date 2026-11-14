@@ -41,7 +41,7 @@ para KDE Plasma 6.
 - **En el escritorio**: Claudito en una esquina de la pantalla, debajo de tus
   ventanas como un widget de escritorio, con un rótulo de lo que está haciendo
   y en qué proyecto. Desde el panel de la barra puedes ocultarlo, ponerlo
-  encima de las ventanas y elegir su pantalla, esquina y tamaño. Haz clic en él para darle
+  encima de las ventanas y elegir su pantalla (o todas), esquina y tamaño. Haz clic en él para darle
   un toque.
 
 El panel sigue el tema y el idioma de Omarchy (inglés y español) y se maneja con
@@ -78,7 +78,8 @@ omarchy plugin remove corico.claudito
 
 Para mostrar u ocultar el muñequito con un atajo:
 `omarchy-shell corico.claudito toggle`. Para pasarlo a otra pantalla:
-`omarchy-shell corico.claudito monitor DP-2` (los nombres salen de `hyprctl monitors`).
+`omarchy-shell corico.claudito monitor DP-2` (los nombres salen de `hyprctl monitors`),
+o `omarchy-shell corico.claudito monitor all` para tenerlo en todas.
 
 ## Cómo funciona
 

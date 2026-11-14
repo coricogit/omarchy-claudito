@@ -7,7 +7,8 @@ import qs.Commons as Commons
 import "ui"
 
 // Claudito on the desktop: a small layer-shell window in a corner of the
-// chosen screen (the first one unless picked in the bar panel). It sits under your windows like a desktop widget, or above
+// chosen screen (the first one unless picked in the bar panel), or of every
+// screen. It sits under your windows like a desktop widget, or above
 // them if you turn that on in the bar panel. Only the buddy itself takes
 // clicks (to poke it); the rest of the window lets them through.
 Scope {
@@ -28,17 +29,24 @@ Scope {
     function show(): void { settings.set("buddy", true) }
     function hide(): void { settings.set("buddy", false) }
     function toggle(): void { settings.set("buddy", !settings.buddy) }
-    function poke(): void { if (buddyLoader.item) buddyLoader.item.poke() }
-    function monitor(name: string): void { settings.set("monitor", name) }
+    function poke(): void {
+      var windows = buddies.instances
+      for (var i = 0; i < windows.length; i++) windows[i].poke()
+    }
+    // A screen name (see hyprctl monitors), or "all" for every screen.
+    function monitor(name: string): void { settings.set("monitor", name === "all" ? "*" : name) }
   }
 
-  // The chosen screen, or the first one if it isn't connected.
-  readonly property var targetScreen: {
+  // Every screen for "*", else the chosen one, or the first one if it isn't
+  // connected.
+  readonly property var targetScreens: {
     var screens = Quickshell.screens
+    if (settings.monitor === "*") return screens.slice()
     for (var i = 0; i < screens.length; i++)
-      if (screens[i].name === settings.monitor) return screens[i]
-    return screens.length > 0 ? screens[0] : null
+      if (screens[i].name === settings.monitor) return [screens[i]]
+    return screens.length > 0 ? [screens[0]] : []
   }
+  readonly property string targetKey: targetScreens.map(function(s) { return s.name }).join(",")
 
   // A layer-shell surface keeps the layer and screen it was created on, so
   // moving the buddy above or below windows, or to another screen, means
@@ -48,16 +56,17 @@ Scope {
     target: settings
     function onOnTopChanged() { root.rebuilding = true; rebuild.restart() }
   }
-  onTargetScreenChanged: { rebuilding = true; rebuild.restart() }
+  onTargetKeyChanged: { rebuilding = true; rebuild.restart() }
   Timer { id: rebuild; interval: 700; onTriggered: root.rebuilding = false }
 
-  LazyLoader {
-    id: buddyLoader
-    active: settings.loaded && settings.buddy && !root.rebuilding && Quickshell.screens.length > 0
+  Variants {
+    id: buddies
+    model: settings.loaded && settings.buddy && !root.rebuilding ? root.targetScreens : []
 
     PanelWindow {
       id: window
-      screen: root.targetScreen
+      required property var modelData
+      screen: modelData
       color: "transparent"
 
       readonly property bool atTop: settings.corner.indexOf("top") === 0

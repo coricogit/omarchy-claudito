@@ -183,7 +183,7 @@ Panel {
 
   function moveCursorH(dx) {
     var count = focusSection === "period" ? 3 : focusSection === "corner" ? 4 : focusSection === "size" ? 3
-      : focusSection === "monitor" ? Quickshell.screens.length : 0
+      : focusSection === "monitor" ? Quickshell.screens.length + 1 : 0
     if (count > 0) selectedIndex = (Math.max(0, selectedIndex) + dx + count) % count
   }
 
@@ -193,17 +193,24 @@ Panel {
     else if (focusSection === "onTop") buddySettings.set("onTop", !buddySettings.onTop)
     else if (focusSection === "corner") buddySettings.set("corner", buddySettings.corners[selectedIndex])
     else if (focusSection === "size") buddySettings.set("size", buddySettings.sizes[selectedIndex])
-    else if (focusSection === "monitor" && Quickshell.screens[selectedIndex]) buddySettings.set("monitor", Quickshell.screens[selectedIndex].name)
+    else if (focusSection === "monitor") buddySettings.set("monitor", monitorName(selectedIndex))
     else if (focusSection === "web") openUsage()
     else if (focusSection === "connect") connectClaude()
   }
 
-  // Which screen the buddy is on: the chosen one, or the first if it's gone.
+  // The screen pills: one per screen, then "All". Which one is on: the
+  // chosen screen, "All", or the first screen if the chosen one is gone.
   function monitorIndex() {
     var screens = Quickshell.screens
+    if (buddySettings.monitor === "*") return screens.length
     for (var i = 0; i < screens.length; i++)
       if (screens[i].name === buddySettings.monitor) return i
     return 0
+  }
+
+  function monitorName(index) {
+    var screens = Quickshell.screens
+    return index < screens.length && screens[index] ? screens[index].name : "*"
   }
 
   function hoverCursor(section, index) {
@@ -701,22 +708,22 @@ Panel {
               id: monitorRow
               visible: Quickshell.screens.length > 1
               width: parent.width
-              columns: Math.max(1, Math.min(4, Quickshell.screens.length))
+              columns: Math.max(1, Math.min(4, Quickshell.screens.length + 1))
               spacing: Style.spacing.xs
               enabled: buddySettings.buddy
               opacity: enabled ? 1 : 0.5
               readonly property real cellWidth: (width - spacing * (columns - 1)) / columns
               Repeater {
-                model: Quickshell.screens
+                model: Quickshell.screens.length + 1
                 OptionPill {
-                  required property var modelData
                   required property int index
+                  readonly property string screenName: root.monitorName(index)
                   section: "monitor"
                   optionIndex: index
                   width: monitorRow.cellWidth
-                  text: String(modelData.name || "?").slice(0, 20)
+                  text: screenName === "*" ? strings.t("buddy.allMonitors") : screenName.slice(0, 20)
                   active: root.monitorIndex() === index
-                  onClicked: buddySettings.set("monitor", modelData.name)
+                  onClicked: buddySettings.set("monitor", screenName)
                 }
               }
             }
