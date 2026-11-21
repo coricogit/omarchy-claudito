@@ -9,6 +9,7 @@ import fcntl
 import json
 import os
 import sys
+import tempfile
 import time
 
 RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
@@ -105,7 +106,10 @@ def main():
     session = str(ev.get("session_id") or "default")
 
     os.makedirs(DIR, mode=0o700, exist_ok=True)
-    with open(os.path.join(DIR, "lock"), "w") as lock:
+    # O_NOFOLLOW and no truncation: a planted symlink is never followed.
+    lock_fd = os.open(os.path.join(DIR, "lock"),
+                      os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    with os.fdopen(lock_fd, "r+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         try:
             with open(STATE) as f:
@@ -130,10 +134,14 @@ def main():
             del sessions[sid]
         state["latest"] = session
         state["updated"] = now
-        tmp = STATE + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(state, f)
-        os.replace(tmp, STATE)
+        fd, tmp = tempfile.mkstemp(dir=DIR, prefix=".state-", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(state, f)
+            os.replace(tmp, STATE)
+        except BaseException:
+            os.unlink(tmp)
+            raise
 
 
 if __name__ == "__main__":

@@ -38,7 +38,7 @@ Item {
     var next = { buddy: buddy, onTop: onTop, corner: corner, size: size, monitor: monitor }
     next[name] = value
     apply(JSON.stringify(next))
-    writer.command = ["sh", "-c", 'mkdir -p "$1" && printf "%s\\n" "$2" > "$3.tmp" && mv "$3.tmp" "$3"',
+    writer.command = ["sh", "-c", 'mkdir -p -m 700 "$1" && t="$(mktemp "$3.XXXXXX")" && printf "%s\\n" "$2" > "$t" && mv -f "$t" "$3"',
                       "claudito", dir, JSON.stringify(next), path]
     writer.running = true
   }

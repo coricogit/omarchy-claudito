@@ -34,13 +34,21 @@ JQ_REMOVE='
 
 edit_settings() {   # $1 = jq program, extra args after
   local prog="$1"; shift
-  mkdir -p "$(dirname "$SETTINGS")"
-  [[ -f $SETTINGS ]] || echo '{}' > "$SETTINGS"
-  cp "$SETTINGS" "$SETTINGS.claudito-backup"
-  local tmp; tmp="$(mktemp)"
+  local dir; dir="$(dirname "$SETTINGS")"
+  # settings.json can hold API keys: everything written here is private (0600),
+  # through fresh temporary files next to it, so an existing backup's
+  # permissions or a planted symlink are never reused.
+  mkdir -p -m 700 "$dir"
+  [[ -f $SETTINGS ]] || ( umask 077; echo '{}' > "$SETTINGS" )
+  local bak tmp
+  bak="$(mktemp "$dir/.settings.json.claudito-backup.XXXXXX")"
+  tmp="$(mktemp "$dir/.settings.json.XXXXXX")"
+  trap 'rm -f "$bak" "$tmp"' RETURN
+  cat "$SETTINGS" > "$bak"
+  mv -f "$bak" "$SETTINGS.claudito-backup"
   jq "$@" "$prog" "$SETTINGS" > "$tmp"
   jq -e . "$tmp" >/dev/null   # never write broken JSON
-  mv "$tmp" "$SETTINGS"
+  mv -f "$tmp" "$SETTINGS"
 }
 
 case "${1:-}" in
