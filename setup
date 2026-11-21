@@ -7,7 +7,7 @@
 #
 #   ./setup            connect
 #   ./setup --check    exit 0 if connected, 1 if not
-#   ./setup --remove   disconnect (do this before removing the plugin)
+#   ./setup --remove   disconnect
 
 set -euo pipefail
 
@@ -15,8 +15,12 @@ DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 SETTINGS="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
 # With ~ instead of $HOME, as Claude Code expands it, so the file stays portable.
 TILDE_DIR="${DIR/#$HOME/\~}"
-HOOK_CMD="$TILDE_DIR/claudito-hook"
-STATUS_CMD="$TILDE_DIR/claudito-statusline"
+# Each command first checks that its script is still there, so removing the
+# plugin with `omarchy plugin remove` (without ./setup --remove) leaves Claude
+# Code with a quiet no-op instead of a hook or status line that fails.
+guarded() { printf '[ -x %s ] && exec %s; true' "$1" "$1"; }
+HOOK_CMD="$(guarded "$TILDE_DIR/claudito-hook")"
+STATUS_CMD="$(guarded "$TILDE_DIR/claudito-statusline")"
 EVENTS=(SessionStart UserPromptSubmit PreToolUse PostToolUse PostToolUseFailure
         PermissionRequest Notification Stop SessionEnd)
 

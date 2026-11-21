@@ -73,5 +73,13 @@
   "connect.text": "Claudito todavía no está conectado a Claude Code. Al conectarlo se añaden sus hooks y su status line a ~/.claude/settings.json (con copia de seguridad); el resto de tus ajustes se mantiene.",
   "connect.button": "Conectar con Claude Code",
   "buddy.monitor": "Pantalla",
-  "buddy.allMonitors": "Todas"
+  "buddy.allMonitors": "Todas",
+  "corner.bottom-left": "↙",
+  "corner.bottom-right": "↘",
+  "corner.top-left": "↖",
+  "corner.top-right": "↗",
+  "dur.dh": "%1 d %2 h",
+  "dur.hm": "%1 h %2 min",
+  "dur.m": "%1 min",
+  "dur.s": "%1 s"
 }

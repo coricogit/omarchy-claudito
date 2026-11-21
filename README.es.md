@@ -55,33 +55,39 @@ Necesitas Omarchy, Python 3 y `jq` (los dos vienen con Omarchy).
 
 ```bash
 omarchy plugin add https://github.com/coricogit/omarchy-claudito.git --enable
-~/.config/omarchy/plugins/corico.claudito/setup
 ```
 
-La primera línea añade el plugin y lo pone en la barra. La segunda lo conecta
-con Claude Code: añade `claudito-hook` como hook asíncrono y
+Eso añade el plugin y lo pone en la barra. Después abre su panel y pulsa
+**Conectar con Claude Code**. Nada toca tus ajustes de Claude Code hasta que lo
+pulses.
+
+Al conectar se añade `claudito-hook` como hook asíncrono y
 `claudito-statusline` como status line en `~/.claude/settings.json`. Respeta el
 resto de tus ajustes y hooks, no toca una status line que ya tengas y guarda
-una copia en `settings.json.claudito-backup`. También puedes saltarte la
-segunda línea y pulsar **Conectar con Claude Code** en el panel de la barra.
+una copia privada en `settings.json.claudito-backup`. Desde la terminal, el
+mismo paso es `~/.config/omarchy/plugins/corico.claudito/setup`.
 
 Las sesiones nuevas de Claude Code usan los hooks automáticamente. En una sesión
 que ya estaba abierta, ejecuta `/hooks` una vez.
 
 Para actualizar: `omarchy plugin update corico.claudito`.
 
-Para quitarlo, desconéctalo antes para que Claude Code no siga llamando a un
-hook que ya no existe:
+Para mostrar u ocultar el muñequito con un atajo:
+`omarchy-shell corico.claudito toggle`. Para pasarlo a otra pantalla:
+`omarchy-shell corico.claudito monitor DP-2` (los nombres salen de `hyprctl monitors`),
+o `omarchy-shell corico.claudito monitor all` para tenerlo en todas.
+
+## Desinstalación
 
 ```bash
 ~/.config/omarchy/plugins/corico.claudito/setup --remove
 omarchy plugin remove corico.claudito
 ```
 
-Para mostrar u ocultar el muñequito con un atajo:
-`omarchy-shell corico.claudito toggle`. Para pasarlo a otra pantalla:
-`omarchy-shell corico.claudito monitor DP-2` (los nombres salen de `hyprctl monitors`),
-o `omarchy-shell corico.claudito monitor all` para tenerlo en todas.
+La primera línea quita el hook y la status line de `~/.claude/settings.json`.
+Si te la saltas no se rompe nada: cada comando comprueba que su script sigue
+ahí y no hace nada cuando el plugin ya no está, así que puedes limpiar
+`settings.json` más tarde.
 
 ## Cómo funciona
 

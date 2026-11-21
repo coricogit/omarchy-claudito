@@ -53,33 +53,39 @@ Needs Omarchy, Python 3 and `jq` (both come with Omarchy).
 
 ```bash
 omarchy plugin add https://github.com/coricogit/omarchy-claudito.git --enable
-~/.config/omarchy/plugins/corico.claudito/setup
 ```
 
-The first line adds the plugin and puts it in the bar. The second connects it
-to Claude Code: it adds `claudito-hook` as an async hook and
-`claudito-statusline` as your status line in `~/.claude/settings.json`. Your
-other settings and hooks are kept, a status line you already have is left
-alone, and a backup goes to `settings.json.claudito-backup`. You can also skip
-the second line and press **Connect to Claude Code** in the bar panel.
+That adds the plugin and puts it in the bar. Then open its panel and press
+**Connect to Claude Code**. Nothing touches your Claude Code settings until you
+press it.
+
+Connecting adds `claudito-hook` as an async hook and `claudito-statusline` as
+your status line in `~/.claude/settings.json`. Your other settings and hooks
+are kept, a status line you already have is left alone, and a private backup
+goes to `settings.json.claudito-backup`. From a terminal, the same step is
+`~/.config/omarchy/plugins/corico.claudito/setup`.
 
 New Claude Code sessions pick the hooks up on their own. In a session that is
 already open, run `/hooks` once.
 
 Update with `omarchy plugin update corico.claudito`.
 
-To remove it, disconnect it first so Claude Code doesn't keep calling a hook
-that is gone:
+To show or hide the buddy from a keybinding:
+`omarchy-shell corico.claudito toggle`. To move it to another screen:
+`omarchy-shell corico.claudito monitor DP-2` (names from `hyprctl monitors`),
+or `omarchy-shell corico.claudito monitor all` for every screen.
+
+## Remove
 
 ```bash
 ~/.config/omarchy/plugins/corico.claudito/setup --remove
 omarchy plugin remove corico.claudito
 ```
 
-To show or hide the buddy from a keybinding:
-`omarchy-shell corico.claudito toggle`. To move it to another screen:
-`omarchy-shell corico.claudito monitor DP-2` (names from `hyprctl monitors`),
-or `omarchy-shell corico.claudito monitor all` for every screen.
+The first line takes the hook and status line out of
+`~/.claude/settings.json`. If you skip it, nothing breaks: each command checks
+that its script is still there and does nothing once the plugin is gone, so you
+can tidy `settings.json` later.
 
 ## How it works
 

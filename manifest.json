@@ -2,8 +2,9 @@
   "schemaVersion": 1,
   "id": "corico.claudito",
   "name": "Claudito",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "corico",
+  "license": "MIT",
   "description": "Claude Code as a pixel-art buddy on the desktop, with hats for each kind of work, plus a bar widget with plan limits, session and token usage",
   "kinds": [
     "service",

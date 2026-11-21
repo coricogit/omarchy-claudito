@@ -1,4 +1,5 @@
 import QtQuick
+import qs.Commons
 
 import "../code/hats.js" as Hats
 import "../code/sprites.js" as Sp
@@ -32,9 +33,11 @@ Item {
 
   SequentialAnimation {
     id: hatSwap
-    NumberAnimation { target: root; property: "hatDrop"; to: -22; duration: root.shownHat ? 150 : 0; easing.type: Easing.InQuad }
+    // The old hat lifts off and the new one settles in: exit shorter than the
+    // entrance, no bounce, and instant when animations are turned off.
+    NumberAnimation { target: root; property: "hatDrop"; to: -22; duration: root.shownHat ? Style.duration(120) : 0; easing.type: Easing.OutCubic }
     ScriptAction { script: root.shownHat = root.hat }
-    NumberAnimation { target: root; property: "hatDrop"; from: -22; to: 0; duration: 500; easing.type: Easing.OutBounce }
+    NumberAnimation { target: root; property: "hatDrop"; from: -22; to: 0; duration: Style.duration(180); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
   }
 
   Timer {
