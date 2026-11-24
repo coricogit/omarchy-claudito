@@ -6,6 +6,7 @@ import qs.Ui
 import qs.Commons
 import qs.Commons as Commons
 
+import "code/mini.js" as Mini
 import "ui"
 
 // Claude usage in the Omarchy bar: a tiny Claudito plus how much of the
@@ -45,20 +46,45 @@ Panel {
   readonly property var limits: live && live.limits ? live.limits : ({})
   readonly property var five: limits.five_hour || null
   readonly property var week: limits.seven_day || null
-  readonly property real fivePct: five && typeof five.percent === "number" ? five.percent : -1
-  readonly property real weekPct: week && typeof week.percent === "number" ? week.percent : -1
+  readonly property real fivePct: limitPct(five)
+  readonly property real weekPct: limitPct(week)
+  readonly property bool strained: fivePct >= 80 || weekPct >= 80
+  readonly property string season: buddySettings.seasonFor(claude.season)
+  readonly property string seasonHat: buddySettings.wearHat ? season : ""
+  readonly property string seasonOutfit: buddySettings.wearOutfit ? season : ""
   readonly property bool liveActive: !!(live && live.updated && now - live.updated < 120)
   readonly property var periodData: usage && usage.periods ? usage.periods[["today", "week", "month"][period]] : null
 
   readonly property string mood: {
     if (claude.mode === "waiting" || claude.mode === "oops") return "worried"
-    if (fivePct >= 80) return "worried"
+    if (claude.mode === "sleep") return "sleep"
+    if (strained) return "worried"   // little left of the plan
     if (claude.busy) return "focus"
-    if (fivePct < 0 && claude.mode === "sleep") return "sleep"
     return fivePct >= 50 ? "focus" : "happy"
   }
 
   // ---------- Formatting ----------
+  // Percent of a plan limit, -1 if unknown. A window that has reset since
+  // Claude Code last reported counts as empty.
+  function limitPct(lim) {
+    if (!lim || typeof lim.percent !== "number") return -1
+    return typeof lim.resetsAt === "number" && lim.resetsAt <= now ? 0 : lim.percent
+  }
+
+  // The same with the time it resets, or the day too if it isn't within one.
+  function limitText(lim) {
+    var pct = pctText(limitPct(lim))
+    if (!lim || typeof lim.resetsAt !== "number" || lim.resetsAt <= now) return pct
+    var fmt = lim.resetsAt - now < 86400 ? "HH:mm" : "ddd HH:mm"
+    return pct + " (" + new Date(lim.resetsAt * 1000).toLocaleString(Qt.locale(Commons.I18n.formatLocale), fmt) + ")"
+  }
+
+  function seasonLabel(name) {
+    if (name === "auto" && claude.season)
+      return strings.t("season.autoNow").arg(strings.t("season." + claude.season).toLowerCase())
+    return strings.t("season." + name)
+  }
+
   function pctText(v) { return v < 0 ? "?" : Commons.I18n.formatNumber(Math.round(v)) + "%" }
 
   function fmtTokens(n) {
@@ -168,8 +194,9 @@ Panel {
   property int selectedIndex: 0
   property bool cursorActive: false
   readonly property var sections: connected
-    ? ["period", "buddy", "onTop", "monitor", "corner", "size", "web"]
-    : ["connect", "period", "buddy", "onTop", "monitor", "corner", "size", "web"]
+    ? controls : ["connect"].concat(controls)
+  readonly property var controls: ["period", "buddy", "onTop", "monitor", "corner", "size",
+                                   "season", "wearHat", "wearOutfit", "notifyWaiting", "notifyDone", "web"]
 
   function moveCursor(dy) {
     var i = Math.max(0, sections.indexOf(focusSection))
@@ -178,19 +205,22 @@ Panel {
     else if (focusSection === "corner") selectedIndex = buddySettings.corners.indexOf(buddySettings.corner)
     else if (focusSection === "monitor") selectedIndex = Math.max(0, monitorIndex())
     else if (focusSection === "size") selectedIndex = buddySettings.sizes.indexOf(buddySettings.size)
+    else if (focusSection === "season") selectedIndex = buddySettings.seasons.indexOf(buddySettings.season)
     else selectedIndex = -1
   }
 
   function moveCursorH(dx) {
     var count = focusSection === "period" ? 3 : focusSection === "corner" ? 4 : focusSection === "size" ? 3
+      : focusSection === "season" ? buddySettings.seasons.length
       : focusSection === "monitor" ? Quickshell.screens.length + 1 : 0
     if (count > 0) selectedIndex = (Math.max(0, selectedIndex) + dx + count) % count
   }
 
   function activateCursor() {
     if (focusSection === "period") period = selectedIndex
-    else if (focusSection === "buddy") buddySettings.set("buddy", !buddySettings.buddy)
-    else if (focusSection === "onTop") buddySettings.set("onTop", !buddySettings.onTop)
+    else if (["buddy", "onTop", "wearHat", "wearOutfit", "notifyWaiting", "notifyDone"].indexOf(focusSection) >= 0)
+      buddySettings.set(focusSection, !buddySettings[focusSection])
+    else if (focusSection === "season") buddySettings.set("season", buddySettings.seasons[selectedIndex])
     else if (focusSection === "corner") buddySettings.set("corner", buddySettings.corners[selectedIndex])
     else if (focusSection === "size") buddySettings.set("size", buddySettings.sizes[selectedIndex])
     else if (focusSection === "monitor") buddySettings.set("monitor", monitorName(selectedIndex))
@@ -241,7 +271,7 @@ Panel {
     hasVisualContent: true
     fixedWidth: vertical ? -1 : barRow.implicitWidth + Style.space(12)
     fixedHeight: vertical ? barRow.implicitHeight + Style.space(10) : -1
-    tooltipText: strings.t("tooltip").arg(root.pctText(root.fivePct)).arg(root.pctText(root.weekPct))
+    tooltipText: strings.t("tooltip").arg(root.limitText(root.five)).arg(root.limitText(root.week))
       + "\n" + claude.label
     onPressed: function(b) { root.toggle() }
 
@@ -253,14 +283,17 @@ Panel {
 
       Item {
         width: 16
-        height: 14
+        height: mini.gh
         anchors.verticalCenter: parent.verticalCenter
 
         MiniClaudito {
           id: mini
           width: 16
-          height: 14
+          height: gh
           mood: root.mood
+          badge: claude.mode === "waiting"
+          clothes: Mini.clothes(root.seasonHat, root.seasonOutfit)
+          headRoom: root.seasonHat ? 3 : 0
           // A one-pixel hop while Claude Code is working.
           y: claude.busy && hop.on && Style.duration(100) > 0 ? -1 : 0
         }
@@ -337,6 +370,8 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               mode: claude.mode
               hat: claude.hat
+              seasonHat: root.seasonHat
+              seasonOutfit: root.seasonOutfit
             }
 
             Column {
@@ -787,6 +822,53 @@ Panel {
             }
           }
 
+          // ---------- Seasonal clothes ----------
+          PanelSeparator { foreground: root.fg }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(8)
+
+            PanelSectionHeader { text: strings.t("season"); foreground: root.fg; fontFamily: root.fontFamily }
+
+            Grid {
+              id: seasonRow
+              width: parent.width
+              columns: 2
+              spacing: Style.spacing.xs
+              readonly property real cellWidth: (width - spacing * (columns - 1)) / columns
+              Repeater {
+                model: buddySettings.seasons
+                OptionPill {
+                  required property string modelData
+                  required property int index
+                  section: "season"
+                  optionIndex: index
+                  width: seasonRow.cellWidth
+                  text: root.seasonLabel(modelData)
+                  active: buddySettings.season === modelData
+                  onClicked: buddySettings.set("season", modelData)
+                }
+              }
+            }
+
+            SettingToggle { name: "wearHat"; label: strings.t("season.hat"); description: strings.t("season.hatHint") }
+            SettingToggle { name: "wearOutfit"; label: strings.t("season.outfit"); description: strings.t("season.outfitHint") }
+          }
+
+          // ---------- Notifications ----------
+          PanelSeparator { foreground: root.fg }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(8)
+
+            PanelSectionHeader { text: strings.t("notify"); foreground: root.fg; fontFamily: root.fontFamily }
+
+            SettingToggle { name: "notifyWaiting"; label: strings.t("notify.onWaiting"); description: strings.t("notify.onWaitingHint") }
+            SettingToggle { name: "notifyDone"; label: strings.t("notify.onDone"); description: strings.t("notify.onDoneHint") }
+          }
+
           Button {
             anchors.horizontalCenter: parent.horizontalCenter
             text: "󰖟  " + strings.t("openUsage")
@@ -927,6 +1009,18 @@ Panel {
         Meter { value: 100 * (modelData.out || 0) / share.total }
       }
     }
+  }
+
+  component SettingToggle: Toggle {
+    id: settingToggle
+    required property string name
+    width: parent ? parent.width : 0
+    checked: buddySettings[name] === true
+    hasCursor: root.cursorActive && root.focusSection === name
+    foreground: root.fg
+    fontFamily: root.fontFamily
+    onClicked: buddySettings.set(name, !buddySettings[name])
+    onHovered: function(isHovered) { if (isHovered) root.hoverCursor(settingToggle.name, -1) }
   }
 
   component OptionPill: Button {

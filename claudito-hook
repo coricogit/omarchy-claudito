@@ -2,7 +2,7 @@
 """Claude Code hook for Claudito, the desktop buddy.
 
 Reads the hook event JSON on stdin and records what Claude is doing in
-$XDG_RUNTIME_DIR/claudito/state.json, which the Plasma widget polls.
+$XDG_RUNTIME_DIR/claudito/state.json, which claudito-watch polls.
 It never prints anything and always exits 0, so it can't disturb Claude Code.
 """
 import fcntl
@@ -11,10 +11,13 @@ import os
 import sys
 import tempfile
 import time
+import traceback
 
 RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
 DIR = os.path.join(RUNTIME, "claudito")
 STATE = os.path.join(DIR, "state.json")
+LOG = os.path.join(DIR, "hook.log")
+LOG_MAX = 100_000
 KEEP_SECONDS = 24 * 3600
 
 SEARCH = {"Read", "Grep", "Glob", "LS", "LSP", "NotebookRead"}
@@ -26,6 +29,57 @@ PLAN = {"TodoWrite", "TaskCreate", "TaskUpdate", "EnterPlanMode", "ExitPlanMode"
         "CronCreate", "ScheduleWakeup"}
 CREATE = {"Artifact", "Skill"}
 ASK = {"AskUserQuestion"}
+
+# Notifications that mean Claude Code is blocked until you do something. The
+# rest (idle_prompt, auth_success, agent_completed...) are only informative.
+NEEDS_YOU = {"permission_prompt", "worker_permission_prompt", "elicitation_dialog",
+             "elicitation_url_dialog", "agent_needs_input"}
+ANSWERED = {"elicitation_complete", "elicitation_response"}
+TOOL_EVENTS = {"PreToolUse", "PostToolUse", "PostToolUseFailure"}
+# A permission request and its PreToolUse run at the same time, as separate
+# processes: within this many seconds either one may land first.
+RACE_SECONDS = 1.5
+
+
+def log_error():
+    """Nobody sees what a hook prints: leave the traceback in hook.log. Never
+    the event itself, which may hold anything."""
+    try:
+        os.makedirs(DIR, mode=0o700, exist_ok=True)
+        big = os.path.exists(LOG) and os.path.getsize(LOG) > LOG_MAX
+        # O_NOFOLLOW: a planted symlink is never followed.
+        fd = os.open(LOG, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC
+                     | (os.O_TRUNC if big else os.O_APPEND), 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + traceback.format_exc() + "\n")
+    except OSError:
+        pass
+
+
+def same_dir(a, b):
+    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
+
+
+def project_name(cwd, old):
+    """The project of the session. The folder it started in, not the current
+    one, which moves around as Claude works. Sessions started in the home
+    folder have no project of their own: the last git repository they entered."""
+    cwd = str(cwd or "")
+    home = os.path.expanduser("~")
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or cwd
+    if not root:
+        return old
+    if not same_dir(root, home):
+        return os.path.basename(os.path.normpath(root)) or root
+    d = os.path.normpath(cwd) if cwd else home
+    while not same_dir(d, home):
+        if os.path.exists(os.path.join(d, ".git")):
+            return os.path.basename(d)
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    return old or os.path.basename(os.path.normpath(home))
 
 
 def mode_for_tool(tool):
@@ -68,6 +122,37 @@ def detail_for_tool(tool, args):
     return ""
 
 
+def notification_to_state(ev):
+    kind = ev.get("notification_type")
+    message = short(ev.get("message"))
+    if not kind:   # older Claude Code: only the text tells them apart
+        return None if "waiting for your input" in message else ("waiting", "", message)
+    if kind in NEEDS_YOU:
+        return "waiting", "", message
+    if kind in ANSWERED:
+        return "thinking", "", ""
+    return None
+
+
+def keeps_waiting(old, ev, now):
+    """True if this event says nothing about what `old` is waiting for, so
+    Claudito must go on asking for you."""
+    if old.get("mode") != "waiting":
+        return False
+    name = ev.get("hook_event_name")
+    if name not in TOOL_EVENTS:
+        return False
+    if old.get("agent", "") != str(ev.get("agent_id") or ""):
+        return True   # another (sub)agent of the session is still working
+    if not old.get("tool"):
+        return False
+    tool = str(ev.get("tool_name") or "")
+    same = (old["tool"], old.get("detail", "")) == (tool, detail_for_tool(tool, ev.get("tool_input")))
+    if name == "PreToolUse":
+        return same and now - old.get("ts", 0) < RACE_SECONDS
+    return not same   # a parallel tool finished, not the one that needs you
+
+
 def event_to_state(ev):
     """(mode, tool, detail) for a hook event, or None to ignore it."""
     name = ev.get("hook_event_name", "")
@@ -80,12 +165,13 @@ def event_to_state(ev):
     if name == "PreToolUse":
         return mode_for_tool(tool), tool, detail_for_tool(tool, args)
     if name == "PostToolUse":
-        # Back to thinking between tools, unless it was a question for the user.
-        return ("thinking", "", "") if tool not in ASK else None
+        return "thinking", "", ""   # between tools, or you answered its question
     if name == "PostToolUseFailure":
         return "oops", tool, detail_for_tool(tool, args)
-    if name in ("PermissionRequest", "Notification"):
-        return "waiting", tool, short(ev.get("message")) if name == "Notification" else tool
+    if name == "PermissionRequest":
+        return "waiting", tool, detail_for_tool(tool, args)
+    if name == "Notification":
+        return notification_to_state(ev)
     if name == "Stop":
         return "done", "", ""
     if name == "SessionEnd":
@@ -97,6 +183,7 @@ def main():
     try:
         ev = json.load(sys.stdin)
     except ValueError:
+        log_error()
         return
     now = time.time()
     result = event_to_state(ev)
@@ -123,13 +210,32 @@ def main():
         # Hooks run async, so an older event may land after a newer one.
         if old.get("ts", 0) > now:
             return
-        sessions[session] = {
+        if keeps_waiting(old, ev, now):
+            return
+        name = ev.get("hook_event_name")
+        new = {
             "mode": mode,
             "tool": tool,
             "detail": detail,
-            "project": os.path.basename(str(ev.get("cwd") or "").rstrip("/")),
+            "project": project_name(ev.get("cwd"), old.get("project") or ""),
+            "agent": str(ev.get("agent_id") or ""),
             "ts": now,
         }
+        # When you sent the message being worked on.
+        turn = now if name == "UserPromptSubmit" else old.get("turn")
+        if turn:
+            new["turn"] = turn
+        if mode == "waiting":
+            if name == "Notification" and old.get("mode") == "waiting":
+                # The reminder of a request we already know about.
+                for k in ("tool", "detail", "agent"):
+                    new[k] = old.get(k) or ""
+                new["ts"] = old["ts"]
+                new["resume"] = old.get("resume") or "thinking"
+            else:
+                # What Claude goes back to doing if you say yes.
+                new["resume"] = "thinking" if not tool or tool in ASK else mode_for_tool(tool)
+        sessions[session] = new
         for sid in [s for s, v in sessions.items() if now - v.get("ts", 0) > KEEP_SECONDS]:
             del sessions[sid]
         state["latest"] = session
@@ -148,5 +254,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:  # never break Claude Code
-        pass
+        log_error()
     sys.exit(0)

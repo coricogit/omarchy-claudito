@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Follows what Claude Code is doing, for the desktop buddy and the bar widget.
+
+Runs while the plugin does, started by Buddy.qml. Twice a second it reads what
+claudito-hook and Claude Code left on disk (see activity.py) and writes what to
+show to $XDG_RUNTIME_DIR/claudito/view.json. Each line it prints is a
+notification to send, as JSON.
+"""
+import sys
+
+sys.dont_write_bytecode = True   # new files in the plugin folder reload the shell
+
+import fcntl  # noqa: E402
+import json  # noqa: E402
+import os  # noqa: E402
+import signal  # noqa: E402
+import tempfile  # noqa: E402
+import time  # noqa: E402
+import traceback  # noqa: E402
+
+import activity  # noqa: E402
+import seasons  # noqa: E402
+
+RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+DIR = os.path.join(RUNTIME, "claudito")
+STATE = os.path.join(DIR, "state.json")
+VIEW = os.path.join(DIR, "view.json")
+POLL_SECONDS = 0.5
+SEASON_SECONDS = 60
+
+
+def read_state():
+    """The text of state.json, "" if there is none, None if it can't be read now."""
+    try:
+        with open(STATE, encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return ""
+    except (OSError, ValueError):
+        return None
+
+
+def write_view(text):
+    fd, tmp = tempfile.mkstemp(dir=DIR, prefix=".view-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        os.replace(tmp, VIEW)
+    except BaseException:
+        os.unlink(tmp)
+        raise
+
+
+def only_one(alive):
+    """Waits for the watcher of a shell that is going away. False if this one
+    has to go first."""
+    fd = os.open(os.path.join(DIR, "watch.lock"),
+                 os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    while alive():
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True   # held until this process ends
+        except BlockingIOError:
+            time.sleep(0.2)
+    return False
+
+
+def main():
+    parent = os.getppid()
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+
+    def alive():   # not if the shell crashed and left this behind
+        return os.getppid() == parent
+
+    os.makedirs(DIR, mode=0o700, exist_ok=True)
+    if not only_one(alive):
+        return
+    tracker = activity.Tracker()
+    notifier = activity.Notifier(time.time())
+    written, season, season_at, failed = None, "", 0.0, False
+    try:
+        while alive():
+            now = time.time()
+            try:
+                if abs(now - season_at) >= SEASON_SECONDS:
+                    season, season_at = seasons.current(), now
+                text = read_state()
+                if text is not None:
+                    view, views = tracker.update(text, activity.read_registry(), now)
+                    told = notifier.update(views, now) if views is not None else []
+                    out = json.dumps({**{k: view[k] for k in ("mode", "tool", "detail", "project")},
+                                      "season": season})
+                    if out != written:
+                        write_view(out)
+                        written = out
+                    for kind, v, seconds in told:
+                        print(json.dumps({"kind": kind, "tool": v["tool"], "detail": v["detail"],
+                                          "project": v["project"], "seconds": seconds}), flush=True)
+            except BrokenPipeError:
+                return
+            except Exception:   # a surprise in those files must not stop the polling
+                if not failed:
+                    failed = True
+                    traceback.print_exc()
+            time.sleep(POLL_SECONDS)
+    finally:
+        try:
+            os.unlink(VIEW)   # nobody keeps it up to date any more
+        except OSError:
+            pass
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

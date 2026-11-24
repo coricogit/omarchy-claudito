@@ -15,6 +15,12 @@ Item {
   property string mode: "idle"
   property string hat: hatFor(mode)
 
+  // Seasonal clothes: "spring", "summer", "autumn", "winter" or "" for none.
+  // The hat only shows when there is no work hat; the outfit, always.
+  property string seasonHat: ""
+  property string seasonOutfit: ""
+  readonly property string wornHat: hat || seasonHat
+
   function hatFor(m) { return Hats.hatFor(m) }
 
   readonly property int gridW: 60
@@ -27,24 +33,30 @@ Item {
   property string shownHat: ""
   property real hatDrop: 0
 
-  Component.onCompleted: shownHat = hat
-  onHatChanged: if (hat !== shownHat) hatSwap.restart()
+  Component.onCompleted: shownHat = wornHat
+  onWornHatChanged: if (wornHat !== shownHat) hatSwap.restart()
+  onSeasonOutfitChanged: canvas.requestPaint()
   onModeChanged: canvas.requestPaint()
+  onBlinkingChanged: if (mode === "idle") canvas.requestPaint()
 
   SequentialAnimation {
     id: hatSwap
     // The old hat lifts off and the new one settles in: exit shorter than the
     // entrance, no bounce, and instant when animations are turned off.
     NumberAnimation { target: root; property: "hatDrop"; to: -22; duration: root.shownHat ? Style.duration(120) : 0; easing.type: Easing.OutCubic }
-    ScriptAction { script: root.shownHat = root.hat }
+    ScriptAction { script: root.shownHat = root.wornHat }
     NumberAnimation { target: root; property: "hatDrop"; from: -22; to: 0; duration: Style.duration(180); easing.type: Easing.Bezier; easing.bezierCurve: Style.easeOut }
   }
 
+  // Frames are always 100 ms of animation; while nothing much moves several
+  // go by at once, to draw less often.
+  readonly property int frameStep: hatSwap.running ? 1 : mode === "sleep" ? 5 : mode === "idle" ? 2 : 1
+
   Timer {
-    interval: 100
+    interval: 100 * root.frameStep
     repeat: true
     running: root.visible && root.width > 0
-    onTriggered: { root.frame++; canvas.requestPaint() }
+    onTriggered: { root.frame += root.frameStep; canvas.requestPaint() }
   }
 
   Timer {
@@ -128,6 +140,16 @@ Item {
       px(bx + 2, by + 20, 1, 1, bottom)
       px(bx + 25, by + 20, 1, 1, bottom)
       px(bx + 1, by + 21, 2, 1, side)
+
+      // --- Seasonal outfit ---
+      var outfit = Sp.OUTFITS[root.seasonOutfit]
+      if (outfit) {
+        sprite(outfit, bx, by + 14)
+        for (var ol = 0; ol < outfit.rows.length; ol++)   // keep the left side in shade
+          for (var oc = 0; oc < 2; oc++)
+            if (outfit.rows[ol][oc] !== ".") px(bx + oc, by + 14 + ol, 1, 1, "rgba(0,0,0,0.22)")
+      }
+
       // --- Arms ---
       var armC = "#D96A41"
       var leftArm = { x: bx - 2, y: by + 12 }
@@ -141,6 +163,10 @@ Item {
       if (mode === "terminal" || mode === "work") rightArm = { x: bx + 22, y: by + 17 + (f % 2) }
       px(leftArm.x, leftArm.y, 3, 3, armC)
       px(rightArm.x, rightArm.y, 3, 3, armC)
+      if (outfit && outfit.sleeve) {   // all but the hand
+        px(leftArm.x + 1, leftArm.y, 2, 3, outfit.sleeve)
+        px(rightArm.x, rightArm.y, 2, 3, outfit.sleeve)
+      }
 
       // --- Eyes ---
       var ink = "#1A1A1A"

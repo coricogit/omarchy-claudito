@@ -31,18 +31,39 @@ widgets.
 ## What you get
 
 - **In the bar**: a tiny Claudito and how much of the 5-hour window you've
-  used. It hops while Claude Code works and sweats near the limit. Click it for:
+  used. It hops while Claude Code works, sweats from 80 % of a plan limit and
+  shows an orange **!** when Claude Code is waiting for you. Hover it for both
+  limits and when they reset. Click it for:
   - your plan and account (email hidden until you click it)
   - plan limits: 5-hour window and week, with when each one resets
   - the current Claude Code session: name, model, project, context used, time,
     lines changed and API-equivalent cost
   - tokens written/read, replies and sessions for today, 7 and 30 days, a
     14-day chart and the projects and models you use most
-  - the desktop buddy's settings
+  - the settings of the desktop buddy, its seasonal clothes and the
+    notifications
 - **On the desktop**: Claudito in a corner of the screen, under your windows
   like a desktop widget, with a caption saying what it's doing and in which
   project. From the bar panel you can hide it, keep it above your windows, and
-  pick its screen (or all of them), corner and size. Click it to poke it.
+  pick its screen (or all of them), corner and size. Click it to poke it. It
+  hides while a full-screen window covers its screen.
+- **Seasons**: Claudito dresses for the season where you live (from the country
+  of your time zone, so it is right in both hemispheres). The hat shows when it
+  has no work hat on; the outfit, always. The panel picks another season or
+  takes either piece off.
+
+  | Season | Hat | Outfit |
+  |---|---|---|
+  | Spring | Flower crown | Gardening overalls |
+  | Summer | Straw hat | Hawaiian shirt |
+  | Autumn | Acorn cap with a leaf | Knitted sweater |
+  | Winter | Bobble hat | Scarf |
+
+- **Notifications**, for 5 seconds, when Claude has been waiting for you for
+  more than 5 seconds and when a task of a minute or more ends. Permissions in
+  the Claude desktop app are left to the app's own notifications.
+- **Several sessions**: one that needs you shows first, then the ones working,
+  then the idle ones.
 
 The panel follows the Omarchy theme and language (English and Spanish) and
 works with the keyboard (`j`/`k`, `h`/`l`, Enter).
@@ -92,8 +113,11 @@ can tidy `settings.json` later.
 `claudito-hook` runs on session, prompt, tool, notification and stop events.
 It writes the current activity of each session to
 `$XDG_RUNTIME_DIR/claudito/state.json` (a RAM folder only your user can read),
-and the plugin reads that file. With several sessions open, it follows the
-most recent one. The caption shows file names, search patterns, web domains and
+and `claudito-watch`, which runs while the plugin does, decides from it what to
+show. No hook fires when you answer a permission, press Esc or close the
+terminal, so it also looks at the status Claude Code keeps in
+`~/.claude/sessions`. That folder is internal to Claude Code: if it changes,
+Claudito goes back to the hooks alone. The caption shows file names, search patterns, web domains and
 the descriptions of terminal commands, never file contents.
 
 Plan limits and the live session come from Claude Code's status line, which
@@ -102,7 +126,10 @@ open. The history comes from your local transcripts in `~/.claude/projects`
 (read by `claudito-usage`, cached in `~/.cache/claudito`), and the account from
 `claude auth status`. Nothing is sent anywhere.
 
-The buddy's settings live in `~/.local/state/claudito/omarchy.json`.
+If the hook fails, it says so in `hook.log`, next to `state.json`.
+Tests: `python3 tests/test_claudito.py`.
+
+Your settings live in `~/.local/state/claudito/omarchy.json`.
 
 ## License
 

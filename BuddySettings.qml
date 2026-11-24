@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Desktop buddy settings, shared by the service (which draws the buddy) and
+// Claudito's settings, shared by the service (which draws the buddy) and
 // the bar panel (which changes them). Kept in
 // ~/.local/state/claudito/omarchy.json so both see every change.
 Item {
@@ -11,6 +11,7 @@ Item {
 
   readonly property var corners: ["top-left", "top-right", "bottom-left", "bottom-right"]
   readonly property var sizes: ["small", "medium", "large"]
+  readonly property var seasons: ["auto", "spring", "summer", "autumn", "winter", "none"]
 
   property bool buddy: true
   property bool onTop: false
@@ -18,6 +19,12 @@ Item {
   property string size: "medium"
   // Screen name (e.g. DP-1); empty means the first screen.
   property string monitor: ""
+  // "auto", one of the seasons, or "none".
+  property string season: "auto"
+  property bool wearHat: true
+  property bool wearOutfit: true
+  property bool notifyWaiting: true
+  property bool notifyDone: true
   property bool loaded: false
 
   readonly property string dir: Quickshell.env("HOME") + "/.local/state/claudito"
@@ -31,11 +38,23 @@ Item {
     corner = corners.indexOf(s.corner) >= 0 ? s.corner : "bottom-right"
     size = sizes.indexOf(s.size) >= 0 ? s.size : "medium"
     monitor = typeof s.monitor === "string" ? s.monitor.slice(0, 64) : ""
+    season = seasons.indexOf(s.season) >= 0 ? s.season : "auto"
+    wearHat = s.wearHat !== false
+    wearOutfit = s.wearOutfit !== false
+    notifyWaiting = s.notifyWaiting !== false
+    notifyDone = s.notifyDone !== false
     loaded = true
   }
 
+  // The season to dress for ("" for none), given the one it is now.
+  function seasonFor(current) {
+    return season === "none" ? "" : season === "auto" ? current : season
+  }
+
   function set(name, value) {
-    var next = { buddy: buddy, onTop: onTop, corner: corner, size: size, monitor: monitor }
+    var next = { buddy: buddy, onTop: onTop, corner: corner, size: size, monitor: monitor,
+                 season: season, wearHat: wearHat, wearOutfit: wearOutfit,
+                 notifyWaiting: notifyWaiting, notifyDone: notifyDone }
     next[name] = value
     apply(JSON.stringify(next))
     writer.command = ["sh", "-c", 'mkdir -p -m 700 "$1" && t="$(mktemp "$3.XXXXXX")" && printf "%s\\n" "$2" > "$t" && mv -f "$t" "$3"',

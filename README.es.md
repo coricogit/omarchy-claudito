@@ -31,20 +31,41 @@ para KDE Plasma 6.
 ## Qué incluye
 
 - **En la barra**: un mini Claudito y cuánto llevas de la ventana de 5 horas.
-  Da saltitos mientras Claude Code trabaja y suda cerca del límite. Al hacer
-  clic muestra:
+  Da saltitos mientras Claude Code trabaja, suda a partir del 80 % de un límite
+  del plan y le sale un **!** naranja cuando Claude Code te está esperando. Al
+  pasar el ratón ves los dos límites y cuándo se reinician. Al hacer clic
+  muestra:
   - tu plan y tu cuenta (el email queda oculto hasta que haces clic)
   - los límites del plan: ventana de 5 horas y semanal, con cuándo se reinicia cada una
   - la sesión actual de Claude Code: nombre, modelo, proyecto, contexto usado,
     tiempo, líneas cambiadas y coste equivalente en API
   - tokens escritos y leídos, respuestas y sesiones de hoy, 7 y 30 días, una
     gráfica de 14 días y los proyectos y modelos que más usas
-  - los ajustes del muñequito del escritorio
+  - los ajustes del muñequito del escritorio, de su ropa de estación y de los
+    avisos
 - **En el escritorio**: Claudito en una esquina de la pantalla, debajo de tus
   ventanas como un widget de escritorio, con un rótulo de lo que está haciendo
   y en qué proyecto. Desde el panel de la barra puedes ocultarlo, ponerlo
   encima de las ventanas y elegir su pantalla (o todas), esquina y tamaño. Haz clic en él para darle
-  un toque.
+  un toque. Se oculta mientras una ventana a pantalla completa cubre su
+  pantalla.
+- **Estaciones**: Claudito se viste según la estación de donde vives (por el
+  país de tu zona horaria, así que acierta en los dos hemisferios). El gorro
+  sale cuando no lleva uno de trabajo; el traje, siempre. En el panel puedes
+  elegir otra estación o quitarle cualquiera de las dos prendas.
+
+  | Estación | Gorro | Traje |
+  |---|---|---|
+  | Primavera | Corona de flores | Peto de jardinero |
+  | Verano | Sombrero de paja | Camisa hawaiana |
+  | Otoño | Gorro de bellota con una hoja | Suéter tejido |
+  | Invierno | Gorro de lana con pompón | Bufanda |
+
+- **Avisos**, durante 5 segundos, cuando Claude lleva más de 5 segundos
+  esperándote y cuando termina una tarea de un minuto o más. De los permisos en
+  la aplicación de escritorio de Claude avisa ella misma.
+- **Varias sesiones**: primero se muestra la que te necesita, después las que
+  trabajan y al final las inactivas.
 
 El panel sigue el tema y el idioma de Omarchy (inglés y español) y se maneja con
 el teclado (`j`/`k`, `h`/`l`, Enter).
@@ -94,8 +115,11 @@ ahí y no hace nada cuando el plugin ya no está, así que puedes limpiar
 `claudito-hook` se ejecuta en los eventos de sesión, mensaje, herramientas,
 notificaciones y fin. Guarda la actividad de cada sesión en
 `$XDG_RUNTIME_DIR/claudito/state.json` (una carpeta en RAM que solo puede leer tu
-usuario) y el plugin lee ese archivo. Si tienes varias sesiones abiertas, sigue
-la más reciente. El rótulo muestra nombres de archivo, patrones de búsqueda,
+usuario) y `claudito-watch`, que funciona mientras lo hace el plugin, decide a
+partir de él qué mostrar. Ningún hook avisa cuando respondes a un permiso,
+pulsas Esc o cierras la terminal, así que también mira el estado que Claude
+Code guarda en `~/.claude/sessions`. Esa carpeta es interna de Claude Code: si
+cambia, Claudito vuelve a usar solo los hooks. El rótulo muestra nombres de archivo, patrones de búsqueda,
 dominios web y la descripción de los comandos de terminal, nunca el contenido
 de los archivos.
 
@@ -106,7 +130,10 @@ Claude Code está abierto. El historial sale de tus transcripciones locales en
 `~/.cache/claudito`) y la cuenta, de `claude auth status`. No se envía nada a
 ningún sitio.
 
-Los ajustes del muñequito se guardan en `~/.local/state/claudito/omarchy.json`.
+Si el hook falla, lo deja escrito en `hook.log`, junto a `state.json`.
+Pruebas: `python3 tests/test_claudito.py`.
+
+Tus ajustes se guardan en `~/.local/state/claudito/omarchy.json`.
 
 ## Licencia
 

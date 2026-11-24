@@ -24,6 +24,16 @@ except ValueError:
 try:
     os.makedirs(DIR, mode=0o700, exist_ok=True)
     data["_saved"] = time.time()
+    # Leftovers of status lines that Claude Code stopped halfway.
+    for name in os.listdir(DIR):
+        if name.startswith(".statusline-"):
+            old = os.path.join(DIR, name)
+            try:
+                if time.time() - os.path.getmtime(old) > 60:
+                    os.unlink(old)
+            except OSError:
+                pass
+    # A file of its own: several sessions may be writing at once.
     fd, tmp = tempfile.mkstemp(dir=DIR, prefix=".statusline-", suffix=".tmp")
     try:
         with os.fdopen(fd, "w") as f:
